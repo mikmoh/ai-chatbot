@@ -22,7 +22,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 app = FastAPI()
 
 # Replace this with your actual Vercel frontend URL
-FRONTEND_URL = "https://vercel.com/mikhails-projects-5054cde5/ai-chatbot-frontend"
+FRONTEND_URL = "https://ai-chatbot-frontend-liard.vercel.app/"
 
 app.add_middleware(
     CORSMiddleware,
