@@ -1,45 +1,86 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
+from time import time
+import logging
+import os
 
-# Create FastAPI app
+# ------------------------
+# Logging setup
+# ------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ------------------------
+# App setup
+# ------------------------
 app = FastAPI()
 
-# CORS (allow frontend; restrict later in production)
+FRONTEND_URL = "https://ai-chatbot-production-4a26.up.railway.app/"  # CHANGE THIS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
-# OpenAI client (uses OPENAI_API_KEY from env)
-client = OpenAI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-SYSTEM_PROMPT = (
-    "You are a helpful, friendly chatbot. "
-    "Use clear formatting with paragraphs, bullet points, and code blocks where appropriate."
-)
+# ------------------------
+# Rate limiting
+# ------------------------
+RATE_LIMIT = {}
+MAX_REQUESTS = 20
+WINDOW_SECONDS = 60
 
+def rate_limit(ip: str):
+    now = time()
+    requests = RATE_LIMIT.get(ip, [])
+    requests = [t for t in requests if now - t < WINDOW_SECONDS]
+
+    if len(requests) >= MAX_REQUESTS:
+        logger.warning(f"Rate limit exceeded: {ip}")
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    requests.append(now)
+    RATE_LIMIT[ip] = requests
+
+# ------------------------
+# Request schema
+# ------------------------
 class ChatRequest(BaseModel):
-    messages: list
+    message: str
+
+# ------------------------
+# Routes
+# ------------------------
+@app.get("/")
+def healthcheck():
+    return {"status": "Backend running"}
 
 @app.post("/chat")
-def chat(request: ChatRequest):
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + request.messages
+def chat(req: ChatRequest, request: Request):
+    rate_limit(request.client.host)
+    logger.info("Chat request received")
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-        temperature=0.7,
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful chatbot."},
+                {"role": "user", "content": req.message},
+            ],
+        )
 
-    return {
-        "reply": response.choices[0].message.content
-    }
+        reply = response.choices[0].message.content
+        return {"reply": reply}
 
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
