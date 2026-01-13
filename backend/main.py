@@ -1,86 +1,69 @@
-from fastapi import FastAPI, Request, HTTPException
+import os
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
-from time import time
-import logging
-import os
 
-# ------------------------
-# Logging setup
-# ------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# -------------------------
+# Load environment variables
+# -------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY is not set in environment variables!")
 
-# ------------------------
-# App setup
-# ------------------------
+# -------------------------
+# Initialize OpenAI client
+# -------------------------
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# -------------------------
+# FastAPI setup
+# -------------------------
 app = FastAPI()
 
-FRONTEND_URL = "https://vercel.com/mikhails-projects-5054cde5/ai-chatbot-frontend"  # CHANGE THIS
+# Replace this with your actual Vercel frontend URL
+FRONTEND_URL = "https://vercel.com/mikhails-projects-5054cde5/ai-chatbot-frontend"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=[
+        "http://localhost:3000",  # for local dev
+        FRONTEND_URL              # for deployed frontend
+    ],
     allow_credentials=True,
-    allow_methods=["POST", "GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# ------------------------
-# Rate limiting
-# ------------------------
-RATE_LIMIT = {}
-MAX_REQUESTS = 20
-WINDOW_SECONDS = 60
-
-def rate_limit(ip: str):
-    now = time()
-    requests = RATE_LIMIT.get(ip, [])
-    requests = [t for t in requests if now - t < WINDOW_SECONDS]
-
-    if len(requests) >= MAX_REQUESTS:
-        logger.warning(f"Rate limit exceeded: {ip}")
-        raise HTTPException(status_code=429, detail="Too many requests")
-
-    requests.append(now)
-    RATE_LIMIT[ip] = requests
-
-# ------------------------
-# Request schema
-# ------------------------
+# -------------------------
+# Data model
+# -------------------------
 class ChatRequest(BaseModel):
     message: str
 
-# ------------------------
-# Routes
-# ------------------------
+# -------------------------
+# Health check
+# -------------------------
 @app.get("/")
-def healthcheck():
-    return {"status": "Backend running"}
+def root():
+    return {"status": "backend running"}
 
+# -------------------------
+# Chat endpoint
+# -------------------------
 @app.post("/chat")
-def chat(req: ChatRequest, request: Request):
-    rate_limit(request.client.host)
-    logger.info("Chat request received")
-
+def chat(request: ChatRequest):
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="gpt-4.1-mini",  # change model if needed
             messages=[
-                {"role": "system", "content": "You are a helpful chatbot."},
-                {"role": "user", "content": req.message},
+                {"role": "system", "content": "You are a helpful, friendly chatbot."},
+                {"role": "user", "content": request.message}
             ],
+            temperature=0.7,
         )
-
-        reply = response.choices[0].message.content
-        return {"reply": reply}
-
+        answer = response.choices[0].message.content
+        return {"reply": answer}
     except Exception as e:
-        logger.error(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Catch all errors and return JSON-friendly message
+        raise HTTPException(status_code=500, detail=str(e))
