@@ -1,37 +1,19 @@
 # =====================
-# Environment variables (SECRETS)
+# Backend
 # =====================
-.env
-.env.*
+backend/venv/
+backend/__pycache__/
+backend/.env
 
 # =====================
-# Python
+# Frontend
 # =====================
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# =====================
-# Frontend / Node
-# =====================
-node_modules/
+frontend/node_modules/
 frontend/build/
 
 # =====================
-# Logs
-# =====================
-*.log
-
-# =====================
-# OS files
+# OS / Editor
 # =====================
 .DS_Store
 Thumbs.db
-
-# =====================
-# Editors / IDEs
-# =====================
 .vscode/
-.idea/
