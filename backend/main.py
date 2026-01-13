@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # ------------------------
 app = FastAPI()
 
-FRONTEND_URL = "https://ai-chatbot-production-4a26.up.railway.app/"  # CHANGE THIS
+FRONTEND_URL = "https://vercel.com/mikhails-projects-5054cde5/ai-chatbot-frontend"  # CHANGE THIS
 
 app.add_middleware(
     CORSMiddleware,
