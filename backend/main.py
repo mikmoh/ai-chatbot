@@ -5,30 +5,29 @@ from pydantic import BaseModel
 from openai import OpenAI
 
 # -------------------------
-# Load environment variables
+# Environment variables
 # -------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY is not set in environment variables!")
+    raise RuntimeError("OPENAI_API_KEY is not set")
 
 # -------------------------
-# Initialize OpenAI client
+# OpenAI client
 # -------------------------
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -------------------------
-# FastAPI setup
+# FastAPI app
 # -------------------------
 app = FastAPI()
 
-# Replace this with your actual Vercel frontend URL
-FRONTEND_URL = "https://ai-chatbot-frontend-liard.vercel.app/"
+FRONTEND_URL = "https://ai-chatbot-frontend-liard.vercel.app"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # for local dev
-        FRONTEND_URL              # for deployed frontend
+        "http://localhost:3000",
+        FRONTEND_URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -36,7 +35,7 @@ app.add_middleware(
 )
 
 # -------------------------
-# Data model
+# Models
 # -------------------------
 class ChatRequest(BaseModel):
     message: str
@@ -52,18 +51,16 @@ def root():
 # Chat endpoint
 # -------------------------
 @app.post("/chat")
-def chat(request: ChatRequest):
+def chat(req: ChatRequest):
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-mini",  # change model if needed
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful, friendly chatbot."},
-                {"role": "user", "content": request.message}
+                {"role": "user", "content": req.message},
             ],
             temperature=0.7,
         )
-        answer = response.choices[0].message.content
-        return {"reply": answer}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
-        # Catch all errors and return JSON-friendly message
         raise HTTPException(status_code=500, detail=str(e))
